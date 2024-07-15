@@ -1,6 +1,6 @@
 module github.com/matrixone-cloud/scale-agent
 
-go 1.20
+go 1.22
 
 require (
 	github.com/onsi/ginkgo/v2 v2.9.5

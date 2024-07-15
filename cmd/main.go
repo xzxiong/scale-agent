@@ -18,11 +18,13 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -31,9 +33,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	webappv1 "github.com/matrixone-cloud/scale-agent/api/v1"
-	"github.com/matrixone-cloud/scale-agent/internal/controller"
 	//+kubebuilder:scaffold:imports
+
+	"github.com/matrixone-cloud/scale-agent/pkg/controller"
+	"github.com/matrixone-cloud/scale-agent/pkg/version"
 )
 
 var (
@@ -41,10 +44,15 @@ var (
 	setupLog = ctrl.Log.WithName("setup")
 )
 
+const (
+	defaultMetricsAddr = ":8080"
+	defaultProbeAddr   = ":8081"
+	defaultPprofAddr   = ":8082"
+)
+
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(webappv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -52,24 +60,36 @@ func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
-	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	var pprofAddr string
+	var versionShow bool
+	flag.StringVar(&metricsAddr, "metrics-bind-address", defaultMetricsAddr, "The address the metric endpoint binds to.")
+	flag.StringVar(&probeAddr, "health-probe-bind-address", defaultProbeAddr, "The address the probe endpoint binds to.")
+	flag.StringVar(&pprofAddr, "pprof-address", defaultPprofAddr, "The address the pprof endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.BoolVar(&versionShow, "version", false, "Show version and quit")
 	opts := zap.Options{
 		Development: true,
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
+	if versionShow {
+		fmt.Println(version.GetInfoOneLine())
+		os.Exit(0)
+	}
+
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
+		Scheme:             scheme,
+		MetricsBindAddress: metricsAddr,
+		WebhookServer: webhook.NewServer(webhook.Options{
+			Port: 9443,
+		}),
 		HealthProbeBindAddress: probeAddr,
+		PprofBindAddress:       pprofAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "f67856fc.core.matrixone-cloud",
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
@@ -89,7 +109,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.GuestbookReconciler{
+	if err = (&controller.PodReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {

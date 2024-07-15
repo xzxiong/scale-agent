@@ -1,33 +1,36 @@
 # Build the manager binary
-FROM golang:1.20 as builder
+FROM golang:1.22.3-bookworm as builder
 ARG TARGETOS
 ARG TARGETARCH
+ARG GITHUB_ACCESS_TOKEN
+ARG GOPROXY="https://goproxy.cn,direct"
+
+RUN go env -w GOPROXY=${GOPROXY} GOPRIVATE="github.com/matrixone-cloud"
 
 WORKDIR /workspace
-# Copy the Go Modules manifests
-COPY go.mod go.mod
-COPY go.sum go.sum
-# cache deps before building and copying source so that we don't need to re-download as much
-# and so that source changes don't invalidate our downloaded layer
+# Copy the Go Modules / go sources
+COPY . .
+
+# Config for pulling private repro
+RUN git config --global url."https://${GITHUB_ACCESS_TOKEN}:@github.com/".insteadOf "https://github.com/"
 RUN go mod download
 
-# Copy the go source
-COPY cmd/main.go cmd/main.go
-COPY api/ api/
-COPY internal/controller/ internal/controller/
-
 # Build
-# the GOARCH has not a default value to allow the binary be built according to the host where the command
-# was called. For example, if we call make docker-build in a local env which has the Apple Silicon M1 SO
-# the docker BUILDPLATFORM arg will be linux/arm64 when for Apple x86 it will be linux/amd64. Therefore,
-# by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
+RUN make build
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM gcr.io/distroless/static:nonroot
+FROM ubuntu:22.04
 WORKDIR /
-COPY --from=builder /workspace/manager .
-USER 65532:65532
+RUN apt update && apt -y install locales curl
+RUN locale-gen en_US.UTF-8
+ENV LANG en_US.UTF-8
+ENV LANGUAGE en_US:en
+ENV LC_ALL en_US.UTF-8
 
-ENTRYPOINT ["/manager"]
+WORKDIR /
+COPY --from=builder /workspace/bin/scale-agent .
+
+EXPOSE 8080
+
+ENTRYPOINT ["/scale-agent"]
