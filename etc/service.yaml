@@ -1,0 +1,8 @@
+
+app:
+  node-name: "auto"
+  resource-range: "matrixone.cloud/resource-range"
+
+mo:
+  labels:
+    matrixone.cloud/vertical-scaling: y

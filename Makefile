@@ -166,8 +166,11 @@ clean:
 
 .PHONY: install-static-check-tools
 install-static-check-tools:
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | bash -s -- -b $(GOPATH)/bin v1.55.2
+	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | bash -s -- -b $(GOPATH)/bin v1.59.1
+	@go install github.com/apache/skywalking-eyes/cmd/license-eye@v0.4.0
 
 .PHONY: static-check
 static-check:
 	$(GOPATH)/bin/golangci-lint run -c .golangci.yml ./...
+	$(CGO_OPTS) license-eye -c .licenserc.yml header check
+	$(CGO_OPTS) license-eye -c .licenserc.yml dep check

@@ -35,8 +35,9 @@ import (
 
 	//+kubebuilder:scaffold:imports
 
-	"github.com/matrixone-cloud/scale-agent/pkg/controller"
-	"github.com/matrixone-cloud/scale-agent/pkg/version"
+	"github.com/matrixorigin/scale-agent/pkg/config"
+	"github.com/matrixorigin/scale-agent/pkg/controller"
+	"github.com/matrixorigin/scale-agent/pkg/version"
 )
 
 var (
@@ -62,6 +63,7 @@ func main() {
 	var probeAddr string
 	var pprofAddr string
 	var versionShow bool
+	var cfgPath string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", defaultMetricsAddr, "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", defaultProbeAddr, "The address the probe endpoint binds to.")
 	flag.StringVar(&pprofAddr, "pprof-address", defaultPprofAddr, "The address the pprof endpoint binds to.")
@@ -69,11 +71,13 @@ func main() {
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.BoolVar(&versionShow, "version", false, "Show version and quit")
+	flag.StringVar(&cfgPath, "cfg", "", "The config filepath")
 	opts := zap.Options{
 		Development: true,
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
+	// END> cmd-line parsed.
 
 	if versionShow {
 		fmt.Println(version.GetInfoOneLine())
@@ -81,6 +85,17 @@ func main() {
 	}
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	// read config
+	if cfgPath != "" {
+		if _, err := config.InitConfiguration(setupLog, cfgPath); err != nil {
+			os.Exit(1)
+		}
+	}
+
+	// TODO: init strategy manager
+	// TODO: init cgroup manager
+	// TODO: init pod manager
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,

@@ -18,10 +18,16 @@ import (
 	"context"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	apilabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/matrixorigin/scale-agent/pkg/config"
+	"github.com/matrixorigin/scale-agent/pkg/errcode"
+	selfpod "github.com/matrixorigin/scale-agent/pkg/pod"
 )
 
 // PodReconciler reconciles a Guestbook object
@@ -36,11 +42,66 @@ type PodReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.15.0/pkg/reconcile
 func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	var err error
+	cfg := config.GetConfiguration()
+	l := log.FromContext(ctx)
 
-	// TODO(user): your logic here
+	pod := &corev1.Pod{}
+	if err = r.Get(ctx, req.NamespacedName, pod); err != nil {
+		if !apierrors.IsNotFound(err) {
+			l.Info("Get pod error, wait next reconcile", "error", err)
+			return ctrl.Result{Requeue: true}, err
+		}
+		// TODO: trigger PodManger check pod exist. req.NamespacedName -> podManger.eventC
+		return ctrl.Result{}, nil
+	}
 
+	// check the nodeName
+	if pod.Spec.NodeName != cfg.App.GetNodeName() {
+		l.Info("passed, pod not belong to this node", "podNode", pod.Spec.NodeName, "curNode", cfg.App.GetNodeName())
+		return ctrl.Result{}, nil
+	}
+
+	// selected by selector
+	selector, err := cfg.MO.GetLabelSelector()
+	if err != nil {
+		l.Info("failed to get config label selector error", "error", err)
+		goto errorL
+	} else if !selector.Matches(apilabels.Set(pod.Labels)) {
+		l.Info("pod label not match", "labels", pod.Labels)
+		goto successL
+	} else {
+		// check resource-rage
+		resourceJson, exist := pod.Annotations[cfg.App.ResourceRange]
+		if !exist {
+			err = errcode.ErrorNoResourceRange
+			l.Error(err, "failed to get pod ResourceRange")
+			goto errorL
+		}
+
+		_, err = config.ParseResourceRange(resourceJson)
+		if err != nil {
+			l.Error(err, "failed to parse resource-range", "resource", resourceJson)
+			goto errorL
+		}
+	}
+
+	// fixme: check resource-ranges
+
+	// send event
+	err = selfpod.GetManger().NewPod(pod)
+	if err != nil {
+		l.Error(err, "failed to create pod", "pod", pod)
+		goto errorL
+	}
+
+successL:
+	l.Info("done")
 	return ctrl.Result{}, nil
+
+errorL:
+	l.Info("wait next reconcile")
+	return ctrl.Result{Requeue: true}, err
 }
 
 // SetupWithManager sets up the controller with the Manager.
