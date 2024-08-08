@@ -37,7 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 
-	"github.com/xzxiong/scale-agent-demo/pkg/util"
+	"github.com/matrixorigin/scale-agent/pkg/util"
 )
 
 func buildContainerMgr() (*kubelet.Dependencies, error) {

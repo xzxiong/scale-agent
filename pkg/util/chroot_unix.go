@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//	http://www.apache.org/licenses/LICENSE-2.0
+//      http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,16 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package errcode
+//go:build !windows
+// +build !windows
+
+package util
 
 import (
-	"errors"
+	"os"
+	"path/filepath"
+	"syscall"
+
+	"github.com/pkg/errors"
 )
 
-var ErrorNoResourceRange = errors.New("NOResourceRange")
+const RootFS = DefaultRootfs
 
-func NoErrOrDie(err error) {
-	if err != nil {
-		panic(err)
+func Chroot(rootfs string) error {
+	if err := syscall.Chroot(rootfs); err != nil {
+		return errors.Wrapf(err, "unable to chroot to %s", rootfs)
 	}
+	root := filepath.FromSlash("/")
+	if err := os.Chdir(root); err != nil {
+		return errors.Wrapf(err, "unable to chdir to %s", root)
+	}
+	return nil
 }
