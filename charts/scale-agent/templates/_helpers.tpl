@@ -75,8 +75,8 @@ Create the name of the service account to use
 {{- define "scale-agent-configmap.data" -}}
 config.yaml: |
   app:
-    node-name: "auto"
-    resource-range: "matrixone.cloud/resource-range"
+    nodeName: "auto"
+    resourceRange: "matrixone.cloud/resource-range"
   mo:
     labels:
     - matrixone.cloud/vertical-scaling=y

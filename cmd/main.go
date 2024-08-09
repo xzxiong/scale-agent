@@ -43,6 +43,7 @@ import (
 
 	"github.com/matrixorigin/scale-agent/pkg/config"
 	"github.com/matrixorigin/scale-agent/pkg/controller"
+	"github.com/matrixorigin/scale-agent/pkg/errcode"
 	"github.com/matrixorigin/scale-agent/pkg/version"
 )
 
@@ -98,10 +99,14 @@ func main() {
 		if _, err := config.InitConfiguration(setupLog, cfgPath); err != nil {
 			os.Exit(1)
 		}
+		// load NodeName
 		cfg := config.GetConfiguration()
 		if cfg.App.NodeName == config.NodeNameAuto {
-			nodeName := GetNodeName(ctx)
-			cfg.App.SetNodeName(nodeName)
+			if nodeName, err := GetNodeName(ctx); err != nil {
+				os.Exit(1)
+			} else {
+				cfg.App.SetNodeName(nodeName)
+			}
 		}
 	}
 
@@ -169,20 +174,31 @@ func main() {
 	}
 }
 
-func GetNodeName(ctx context.Context) string {
+func GetNodeName(ctx context.Context) (string, error) {
 
 	clientset := GetK8sClient()
 
 	podName := os.Getenv(config.EnvPodName)
 	podNS := os.Getenv(config.EnvPodNamespace)
 	setupLog.Info("base info", "namespace", podNS, "name", podName)
+	if podName == "" {
+		err := errcode.ErrorNoPodName
+		setupLog.Error(err, fmt.Sprintf("env %s is empty", config.EnvPodName))
+		return "", err
+	}
+	if podNS == "" {
+		err := errcode.ErrorNoNamespace
+		setupLog.Error(err, fmt.Sprintf("env %s is empty", config.EnvPodNamespace))
+		return "", err
+	}
 
 	// 获取当前 Pod 的信息
 	pod, err := clientset.CoreV1().Pods(podNS).Get(ctx, podName, metav1.GetOptions{})
 	if err != nil {
-		panic(err.Error())
+		setupLog.Error(err, "failed to load current pod info")
+		return "", err
 	}
-	return pod.Spec.NodeName
+	return pod.Spec.NodeName, nil
 }
 
 var getClinetOnce sync.Once

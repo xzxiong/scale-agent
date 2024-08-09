@@ -79,8 +79,8 @@ func NewConfiguration() *Configuration {
 }
 
 type AppConfig struct {
-	NodeName      string `yaml:"node-name"`
-	ResourceRange string `yaml:"resource-range"`
+	NodeName      string `yaml:"nodeName"`
+	ResourceRange string `yaml:"resourceRange"`
 }
 
 func NewAppConfig() *AppConfig {

@@ -18,7 +18,11 @@ import (
 	"errors"
 )
 
-var ErrorNoResourceRange = errors.New("NOResourceRange")
+var (
+	ErrorNoResourceRange = errors.New("NoResourceRange")
+	ErrorNoPodName       = errors.New("NoPodName")
+	ErrorNoNamespace     = errors.New("NoNamespace")
+)
 
 func NoErrOrDie(err error) {
 	if err != nil {

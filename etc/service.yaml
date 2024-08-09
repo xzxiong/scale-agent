@@ -1,6 +1,6 @@
 
 app:
-  node-name: "auto"
+  nodeName: "auto"
   resource-range: "matrixone.cloud/resource-range"
 
 mo:
