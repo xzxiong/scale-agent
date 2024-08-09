@@ -1,3 +1,5 @@
+{{- if eq .Values.mode "Deployment" -}}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -24,7 +26,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
-              containerPort: 8080
+              containerPort: {{ .Values.service.port }}
               protocol: TCP
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
@@ -75,3 +77,11 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- with .Values.dnsConfig }}
+      dnsConfig:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.restartPolicy }}
+      restartPolicy: {{ . }}
+      {{- end }}
+{{- end -}}
