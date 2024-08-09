@@ -23,8 +23,10 @@ import (
 	"os"
 	"sync"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -118,6 +120,7 @@ func main() {
 	// TODO: init strategy manager
 	// TODO: init cgroup manager
 	// TODO: init pod manager
+	// 	- need wait mgr.Elected()
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
@@ -166,6 +169,16 @@ func main() {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
 	}
+
+	// init self-defined. indexer
+	indexer := mgr.GetFieldIndexer()
+	indexer.IndexField(ctx, &corev1.Pod{}, config.K8sFieldNodeName, func(o client.Object) []string {
+		nodeName := o.(*corev1.Pod).Spec.NodeName
+		if nodeName != "" {
+			return []string{nodeName}
+		}
+		return nil
+	})
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

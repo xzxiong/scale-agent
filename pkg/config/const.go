@@ -23,3 +23,8 @@ const (
 	EnvPodNamespace = "POD_NAMESPACE"
 	EnvPodName      = "HOSTNAME"
 )
+
+// k8s key
+const (
+	K8sFieldNodeName = "spec.nodeName"
+)
