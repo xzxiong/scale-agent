@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scale-agent
+  namespace: {{ .Release.Namespace }}
+data:
+{{ include "scale-agent-configmap.data" . | indent 2 }}

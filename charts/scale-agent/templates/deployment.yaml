@@ -12,8 +12,9 @@ spec:
       {{- include "scale-agent.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
       annotations:
+        checksum/config: {{ include "scale-agent-configmap.checksum" . }}
+      {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
@@ -24,6 +25,10 @@ spec:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /scale-agent
+            - -cfg
+            - /etc/scale-agent/config.yaml
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}
@@ -37,6 +42,8 @@ spec:
           - mountPath: /rootfs
             name: rootfs
             readOnly: false
+          - name: cfg-volume
+            mountPath: /etc/scale-agent
           #- mountPath: /var/run
           #  name: var-run
           #  readOnly: true
@@ -50,6 +57,9 @@ spec:
           #  name: disk
           #  readOnly: true
       volumes:
+      - name: cfg-volume
+        configMap:
+          name: scale-agent
       - hostPath:
           path: /
         name: rootfs

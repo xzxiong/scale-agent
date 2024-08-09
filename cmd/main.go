@@ -94,6 +94,11 @@ func main() {
 		}
 	}
 
+	if err := config.GetConfiguration().Validate(); err != nil {
+		setupLog.Error(err, "failed to load configuration")
+		os.Exit(1)
+	}
+
 	// TODO: init strategy manager
 	// TODO: init cgroup manager
 	// TODO: init pod manager

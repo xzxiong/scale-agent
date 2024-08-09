@@ -5,4 +5,4 @@ app:
 
 mo:
   labels:
-    matrixone.cloud/vertical-scaling: y
+    - matrixone.cloud/vertical-scaling=y

@@ -71,3 +71,17 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{- define "scale-agent-configmap.data" -}}
+config.yaml: |
+  app:
+    node-name: "auto"
+    resource-range: "matrixone.cloud/resource-range"
+  mo:
+    labels:
+    - matrixone.cloud/vertical-scaling=y
+{{- end -}}
+
+{{- define "scale-agent-configmap.checksum" -}}
+{{ include "scale-agent-configmap.data" . | sha256sum }}
+{{- end -}}

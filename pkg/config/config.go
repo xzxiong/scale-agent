@@ -16,6 +16,7 @@ package config
 
 import (
 	"os"
+	"strings"
 
 	"github.com/go-logr/logr"
 	"github.com/spf13/viper"
@@ -49,6 +50,13 @@ func InitConfiguration(l logr.Logger, cfgPath string) (*Configuration, error) {
 type Configuration struct {
 	App AppConfig `yaml:"app"`
 	MO  MOConfig  `yaml:"mo"`
+}
+
+func (c *Configuration) Validate() error {
+	if _, err := c.MO.GetLabelSelector(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func GetConfiguration() *Configuration {
@@ -89,17 +97,34 @@ func (c *AppConfig) GetNodeName() string {
 }
 
 type MOConfig struct {
-	Labels map[string]string `yaml:"labels"`
+	Labels []string `yaml:"labels"`
+
+	parsedLabels map[string]string
 }
 
 func NewMOConfig() *MOConfig {
-	return &MOConfig{
-		Labels: make(map[string]string),
-	}
+	return &MOConfig{}
 }
 
 func (c *MOConfig) GetLabelSelector() (labels.Selector, error) {
+	if len(c.parsedLabels) == 0 {
+		c.parsedLabels = ParseLabelsAsMap(c.Labels)
+	}
 	return metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
-		MatchLabels: c.Labels,
+		MatchLabels: c.parsedLabels,
 	})
+}
+
+// ParseLabelsAsMap split each elem in labels by '=' as map's key and value
+func ParseLabelsAsMap(labels []string) map[string]string {
+	m := make(map[string]string, len(labels))
+	for _, e := range labels {
+		if !strings.Contains(e, "=") {
+			m[e] = ""
+		} else {
+			kv := strings.Split(e, "=")
+			m[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+		}
+	}
+	return m
 }
