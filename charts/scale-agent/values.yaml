@@ -61,6 +61,9 @@ nodeSelector: {}
 affinity: {}
 
 tolerations: {}
+  # We are deploy scale-agent to maintain mo scale-up / scale-down flow.
+  # It always runs as DaemonSet, so you may need at least following setting.
+  # - operator: Exists
 
 securityContext: {}
 
