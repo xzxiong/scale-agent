@@ -17,9 +17,14 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
+	"sync"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -59,6 +64,7 @@ func init() {
 }
 
 func main() {
+	var ctx = context.Background()
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
@@ -91,6 +97,11 @@ func main() {
 	if cfgPath != "" {
 		if _, err := config.InitConfiguration(setupLog, cfgPath); err != nil {
 			os.Exit(1)
+		}
+		cfg := config.GetConfiguration()
+		if cfg.App.NodeName == config.NodeNameAuto {
+			nodeName := GetNodeName(ctx)
+			cfg.App.SetNodeName(nodeName)
 		}
 	}
 
@@ -156,4 +167,35 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func GetNodeName(ctx context.Context) string {
+
+	clientset := GetK8sClient()
+
+	podName := os.Getenv(config.EnvPodName)
+	podNS := os.Getenv(config.EnvPodNamespace)
+	setupLog.Info("base info", "namespace", podNS, "name", podName)
+
+	// 获取当前 Pod 的信息
+	pod, err := clientset.CoreV1().Pods(podNS).Get(ctx, podName, metav1.GetOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
+	return pod.Spec.NodeName
+}
+
+var getClinetOnce sync.Once
+var gClientset *kubernetes.Clientset
+
+func GetK8sClient() *kubernetes.Clientset {
+	getClinetOnce.Do(func() {
+		config := ctrl.GetConfigOrDie()
+		clientset, err := kubernetes.NewForConfig(config)
+		if err != nil {
+			panic(err.Error())
+		}
+		gClientset = clientset
+	})
+	return gClientset
 }

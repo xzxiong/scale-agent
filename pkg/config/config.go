@@ -90,10 +90,11 @@ func NewAppConfig() *AppConfig {
 }
 
 func (c *AppConfig) GetNodeName() string {
-	if c.NodeName == NodeNameAuto {
-		c.NodeName = os.Getenv(EnvPodName)
-	}
 	return c.NodeName
+}
+
+func (c *AppConfig) SetNodeName(name string) {
+	c.NodeName = name
 }
 
 type MOConfig struct {
