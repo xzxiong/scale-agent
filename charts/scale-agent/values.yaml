@@ -1,4 +1,4 @@
-# Default values for scale-agent-demo.
+# Default values for scale-agent.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
@@ -6,9 +6,13 @@ replicaCount: 1
 
 enabled: true
 
+global:
+  imagePullSecrets: []
+
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
+namespaceOverride: ""
 
 ## values in [ DaemonSet, Deployment ]
 mode: DaemonSet
@@ -30,7 +34,7 @@ podAnnotations: []
 image:
   repository: docker.io/jacksonxie/repo
   pullPolicy: IfNotPresent
-  tag: scale-agent-demo
+  tag: scale-agent
 
 service:
   port: 8080

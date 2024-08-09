@@ -29,7 +29,6 @@ spec:
       labels:
         {{- include "scale-agent.labels" . | nindent 8 }}
     spec:
-      #automountServiceAccountToken: {{ ternary true false (or .Values.serviceAccount.automountServiceAccountToken .Values.kubeRBACProxy.enabled) }}
       {{- with .Values.securityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
@@ -46,7 +45,7 @@ spec:
       terminationGracePeriodSeconds: {{ . }}
       {{- end }}
       containers:
-        - name: { { .Chart.Name } }
+        - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
@@ -54,7 +53,7 @@ spec:
               containerPort: {{ .Values.service.port }}
               protocol: TCP
           resources:
-            {{ - toYaml .Values.resources | nindent 12 }}
+            {{- toYaml .Values.resources | nindent 12 }}
           env:
             - name: POD_NAMESPACE
               value: {{ .Release.Namespace }}

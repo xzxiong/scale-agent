@@ -3,7 +3,6 @@ kind: ClusterRoleBinding
 metadata:
   labels:
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/created-by: agent-demo
     app.kubernetes.io/part-of: scale-agent
   name: {{ include "scale-agent.fullname" . }}-rolebinding
 roleRef:
@@ -20,7 +19,6 @@ kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/created-by: agent-demo
     app.kubernetes.io/part-of: scale-agent
   name: {{ include "scale-agent.fullname" . }}
 rules:
