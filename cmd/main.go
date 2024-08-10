@@ -21,12 +21,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"sync"
-
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -43,9 +37,9 @@ import (
 
 	//+kubebuilder:scaffold:imports
 
+	"github.com/matrixorigin/scale-agent/cmd/setup"
 	"github.com/matrixorigin/scale-agent/pkg/config"
 	"github.com/matrixorigin/scale-agent/pkg/controller"
-	"github.com/matrixorigin/scale-agent/pkg/errcode"
 	"github.com/matrixorigin/scale-agent/pkg/version"
 )
 
@@ -104,7 +98,7 @@ func main() {
 		// load NodeName
 		cfg := config.GetConfiguration()
 		if cfg.App.NodeName == config.NodeNameAuto {
-			if nodeName, err := GetNodeName(ctx); err != nil {
+			if nodeName, err := setup.GetNodeName(ctx); err != nil {
 				os.Exit(1)
 			} else {
 				cfg.App.SetNodeName(nodeName)
@@ -171,60 +165,11 @@ func main() {
 	}
 
 	// init self-defined. indexer
-	indexer := mgr.GetFieldIndexer()
-	indexer.IndexField(ctx, &corev1.Pod{}, config.K8sFieldNodeName, func(o client.Object) []string {
-		nodeName := o.(*corev1.Pod).Spec.NodeName
-		if nodeName != "" {
-			return []string{nodeName}
-		}
-		return nil
-	})
+	setup.InitManagerIndexer(mgr, ctx)
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
-}
-
-func GetNodeName(ctx context.Context) (string, error) {
-
-	clientset := GetK8sClient()
-
-	podName := os.Getenv(config.EnvPodName)
-	podNS := os.Getenv(config.EnvPodNamespace)
-	setupLog.Info("base info", "namespace", podNS, "name", podName)
-	if podName == "" {
-		err := errcode.ErrorNoPodName
-		setupLog.Error(err, fmt.Sprintf("env %s is empty", config.EnvPodName))
-		return "", err
-	}
-	if podNS == "" {
-		err := errcode.ErrorNoNamespace
-		setupLog.Error(err, fmt.Sprintf("env %s is empty", config.EnvPodNamespace))
-		return "", err
-	}
-
-	// 获取当前 Pod 的信息
-	pod, err := clientset.CoreV1().Pods(podNS).Get(ctx, podName, metav1.GetOptions{})
-	if err != nil {
-		setupLog.Error(err, "failed to load current pod info")
-		return "", err
-	}
-	return pod.Spec.NodeName, nil
-}
-
-var getClinetOnce sync.Once
-var gClientset *kubernetes.Clientset
-
-func GetK8sClient() *kubernetes.Clientset {
-	getClinetOnce.Do(func() {
-		config := ctrl.GetConfigOrDie()
-		clientset, err := kubernetes.NewForConfig(config)
-		if err != nil {
-			panic(err.Error())
-		}
-		gClientset = clientset
-	})
-	return gClientset
 }
