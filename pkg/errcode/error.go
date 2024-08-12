@@ -19,9 +19,11 @@ import (
 )
 
 var (
-	ErrorNoResourceRange = errors.New("NoResourceRange")
-	ErrorNoPodName       = errors.New("NoPodName")
-	ErrorNoNamespace     = errors.New("NoNamespace")
+	ErrNoResourceRange = errors.New("NoResourceRange")
+	ErrNoPodName       = errors.New("NoPodName")
+	ErrNoNamespace     = errors.New("NoNamespace")
+	ErrNotSupported    = errors.New("NotSupported")
+	ErrUnknownEvent    = errors.New("UnknownEvent")
 )
 
 func NoErrOrDie(err error) {

@@ -18,16 +18,18 @@
 package kubelet
 
 import (
-	"fmt"
-
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+
+	"github.com/matrixorigin/scale-agent/pkg/errcode"
 )
 
-var NOTSupported = fmt.Errorf("NOT Supported")
-
-func GetCgroupCpu(pod *corev1.Pod) *cm.ResourceConfig   { return nil }
-func GetKubeletServer() (*options.KubeletServer, error) { return nil, NOTSupported }
+func GetCgroupCpu(pod *corev1.Pod) *cm.ResourceConfig { return nil }
+func GetKubeletServer(logr.Logger) (*options.KubeletServer, error) {
+	return nil, errcode.ErrNotSupported
+}
+func IsCgroupV2() bool { return false }
 
 const Mode = "kubelet"

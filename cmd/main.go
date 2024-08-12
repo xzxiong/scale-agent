@@ -40,6 +40,8 @@ import (
 	"github.com/matrixorigin/scale-agent/cmd/setup"
 	"github.com/matrixorigin/scale-agent/pkg/config"
 	"github.com/matrixorigin/scale-agent/pkg/controller"
+	selfpod "github.com/matrixorigin/scale-agent/pkg/pod"
+	selfutil "github.com/matrixorigin/scale-agent/pkg/util"
 	"github.com/matrixorigin/scale-agent/pkg/version"
 )
 
@@ -62,6 +64,7 @@ func init() {
 
 func main() {
 	var ctx = context.Background()
+	var podManger *selfpod.DaemonSetManager
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
@@ -88,7 +91,9 @@ func main() {
 		os.Exit(0)
 	}
 
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	logger := zap.New(zap.UseFlagOptions(&opts))
+	ctrl.SetLogger(logger)
+	selfutil.SetLogger(logger)
 
 	// read config
 	if cfgPath != "" {
@@ -111,10 +116,24 @@ func main() {
 		os.Exit(1)
 	}
 
-	// TODO: init strategy manager
-	// TODO: init cgroup manager
-	// TODO: init pod manager
-	// 	- need wait mgr.Elected()
+	if err := setup.GetKubeletServer(); err != nil {
+		setupLog.Error(err, "failed to Load kubelet server")
+		os.Exit(1)
+	}
+	// check cgroup manager
+	isCgroupV2, err := setup.IsCgroupV2()
+	if err != nil {
+		setupLog.Error(err, "failed to check cgroup version")
+	}
+	if !isCgroupV2 {
+		// do NOT start up the main flow.
+		setupLog.Info("current cgroup version is not supported. please run in cgroup v2.")
+	} else {
+		// TODO: init strategy manager
+		// TODO: init pod manager
+		// 	- need wait mgr.Elected()
+		podManger = selfpod.NewDaemonSetManger(ctx)
+	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
@@ -166,6 +185,14 @@ func main() {
 
 	// init self-defined. indexer
 	setup.InitManagerIndexer(mgr, ctx)
+
+	if podManger != nil {
+		go func() {
+			<-mgr.Elected()
+			setupLog.Info("starting pod manager")
+			podManger.Start()
+		}()
+	}
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

@@ -74,7 +74,7 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		// check resource-rage
 		resourceJson, exist := pod.Annotations[cfg.App.ResourceRange]
 		if !exist {
-			err = errcode.ErrorNoResourceRange
+			err = errcode.ErrNoResourceRange
 			l.Error(err, "failed to get pod ResourceRange")
 			goto errorL
 		}

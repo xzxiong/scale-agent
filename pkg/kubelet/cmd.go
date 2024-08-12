@@ -19,6 +19,7 @@ package kubelet
 
 import (
 	"fmt"
+	"github.com/go-logr/logr"
 	"os"
 	"path"
 	"path/filepath"
@@ -40,12 +41,14 @@ import (
 	"github.com/matrixorigin/scale-agent/pkg/util"
 )
 
-func buildContainerMgr() (*kubelet.Dependencies, error) {
+// buildContainerMgr
+// deprecated
+func buildContainerMgr(logger logr.Logger) (*kubelet.Dependencies, error) {
 
 	// construct a KubeletServer from kubeletFlags and kubeletConfig
-	kubeletServer, err := GetKubeletServer()
+	kubeletServer, err := GetKubeletServer(logger)
 	if err != nil {
-		klog.ErrorS(err, "Failed to create a new kubelet configuration")
+		logger.Error(err, "Failed to create a new kubelet configuration")
 		os.Exit(1)
 	}
 
@@ -70,7 +73,7 @@ func buildContainerMgr() (*kubelet.Dependencies, error) {
 		return nil, err
 	}
 	// err = containerManager.Start()
-	klog.Infof("NewContainerManager start: %v", kubeDeps.ContainerManager)
+	logger.Info("NewContainerManager start", "ContainerManager", kubeDeps.ContainerManager)
 
 	return kubeDeps, nil
 }
@@ -109,14 +112,19 @@ func initCadvisorInterface(s *options.KubeletServer, kubeDeps *kubelet.Dependenc
 	return nil
 }
 
-func GetCgroupCpu(pod *corev1.Pod) *cm.ResourceConfig {
+func IsCgroupV2() bool {
+	return libcontainercgroups.IsCgroup2UnifiedMode()
+}
+
+// GetCgroupCpu is key function
+func GetCgroupCpu(logger logr.Logger, pod *corev1.Pod) *cm.ResourceConfig {
 
 	// ref k8s.io/kubernetes@v1.28.4/pkg/kubelet/cm/cgroup_manager_linux.go
 
 	// =======
 	// ref cgm.SetCgroupConfig
 	// =======
-	cgm, err := buildCgroupMgr()
+	cgm, err := buildCgroupMgr(logger)
 	if err != nil {
 		panic(err)
 	}
@@ -162,7 +170,7 @@ func GetCgroupCpu(pod *corev1.Pod) *cm.ResourceConfig {
 	return resourceConfig
 }
 
-func setCgroupCpu(pod *corev1.Pod) error {
+func setCgroupCpu(logger logr.Logger, pod *corev1.Pod) error {
 
 	// ref k8s.io/kubernetes@v1.28.4/pkg/kubelet/cm/cgroup_manager_linux.go
 
@@ -174,12 +182,12 @@ func setCgroupCpu(pod *corev1.Pod) error {
 	// 	panic(err)
 	// }
 
-	kubeletServer, err := GetKubeletServer()
+	kubeletServer, err := GetKubeletServer(logger)
 	if err != nil {
 		panic(err)
 	}
 
-	kubeDeps, err := buildContainerMgr()
+	kubeDeps, err := buildContainerMgr(logger)
 	if err != nil {
 		panic(err)
 	}
@@ -233,8 +241,8 @@ func buildCgroupPaths(name cm.CgroupName, cgroupDriver string, subsystems *cm.Cg
 	return cgroupPaths
 }
 
-func buildCgroupMgr() (cm.CgroupManager, error) {
-	kubeletServer, err := GetKubeletServer()
+func buildCgroupMgr(logger logr.Logger) (cm.CgroupManager, error) {
+	kubeletServer, err := GetKubeletServer(logger)
 	if err != nil {
 		panic(err)
 	}
@@ -302,19 +310,30 @@ const componentKubelet = "kubelet"
 
 var chrootOnce sync.Once
 
-// GetKubeletServer
+var gKubeletServer *options.KubeletServer
+var gKubeletServerErr error
+var genKubeletServerOnce sync.Once
+
+func GetKubeletServer(logger logr.Logger) (server *options.KubeletServer, err error) {
+	genKubeletServerOnce.Do(func() {
+		gKubeletServer, gKubeletServerErr = getKubeletServer(logger)
+	})
+	return gKubeletServer, gKubeletServerErr
+}
+
+// getKubeletServer
 // 1. chroot to rootfs
 // 2. get kubelet cmdline
 // 3. parse all cmdline args
 // 4. load kubeletConfig
 // 5. use cmdline args cover kubeletConfig's value
-func GetKubeletServer() (*options.KubeletServer, error) {
+func getKubeletServer(logger logr.Logger) (*options.KubeletServer, error) {
 
 	// init
 	kubeletFlags := options.NewKubeletFlags()
 	kubeletConfig, err := options.NewKubeletConfiguration()
 	if err != nil {
-		klog.ErrorS(err, "Failed to create a new kubelet configuration")
+		logger.Error(err, "Failed to create a new kubelet configuration")
 		os.Exit(1)
 	}
 

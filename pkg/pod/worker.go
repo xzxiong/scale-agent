@@ -16,9 +16,10 @@ package pod
 
 import (
 	"context"
+	"github.com/go-logr/logr"
+	"github.com/matrixorigin/scale-agent/pkg/errcode"
 	"time"
 
-	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -37,7 +38,7 @@ type Event struct {
 }
 
 type Worker struct {
-	*zap.Logger
+	logr.Logger
 	ctx context.Context
 
 	eventC   chan Event
@@ -70,12 +71,12 @@ mainL:
 			case EventTypeUnknown:
 				fallthrough
 			default:
-				w.Error("unknown event", zap.Any("event", event))
+				w.Error(errcode.ErrUnknownEvent, "pod worker catch unknown event", "event", event)
 			}
 
 		case ts := <-ticker.C:
 			// TODO: impl regular check
-			w.Info("regular check", zap.Time("ts", ts))
+			w.Info("regular check", "ts", ts)
 
 		case <-w.ctx.Done():
 			w.Info("pod loop stopped")
@@ -86,9 +87,9 @@ mainL:
 
 const DefaultCheckInterval = 3 * time.Minute
 
-func NewWorker(ctx context.Context, logger *zap.Logger, pod *corev1.Pod) *Worker {
+func NewWorker(ctx context.Context, logger logr.Logger, pod *corev1.Pod) *Worker {
 	w := &Worker{
-		Logger: logger.With(zap.String("pod", GetNamespacedName(pod))),
+		Logger: logger.WithValues("pod", GetNamespacedName(pod)),
 		ctx:    ctx,
 		pod:    pod,
 

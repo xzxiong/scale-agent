@@ -25,12 +25,12 @@ func GetNodeName(ctx context.Context) (string, error) {
 	podNS := os.Getenv(config.EnvPodNamespace)
 	setupLog.Info("base info", "namespace", podNS, "name", podName)
 	if podName == "" {
-		err := errcode.ErrorNoPodName
+		err := errcode.ErrNoPodName
 		setupLog.Error(err, fmt.Sprintf("env %s is empty", config.EnvPodName))
 		return "", err
 	}
 	if podNS == "" {
-		err := errcode.ErrorNoNamespace
+		err := errcode.ErrNoNamespace
 		setupLog.Error(err, fmt.Sprintf("env %s is empty", config.EnvPodNamespace))
 		return "", err
 	}

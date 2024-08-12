@@ -16,9 +16,9 @@ package pod
 
 import (
 	"context"
+	"github.com/go-logr/logr"
 	"sync"
 
-	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -104,7 +104,7 @@ func (d *DaemonSetManager) loop() {
 }
 
 type ManagerConfig struct {
-	logger *zap.Logger
+	logger logr.Logger
 }
 
 type Option func(*ManagerConfig)
@@ -113,7 +113,7 @@ func (o Option) Apply(cfg *ManagerConfig) {
 	o(cfg)
 }
 
-func WithLogger(logger *zap.Logger) Option {
+func WithLogger(logger logr.Logger) Option {
 	return func(cfg *ManagerConfig) {
 		cfg.logger = logger
 	}
