@@ -31,5 +31,12 @@ func GetKubeletServer(logr.Logger) (*options.KubeletServer, error) {
 	return nil, errcode.ErrNotSupported
 }
 func IsCgroupV2() bool { return false }
+func GetCgroupNames(logger logr.Logger, pod *corev1.Pod) (cm.CgroupName, error) {
+	return nil, errcode.ErrNotSupported
+}
+
+func BuildCgroupPaths(name cm.CgroupName, cgroupDriver string, subsystems *cm.CgroupSubsystems) map[string]string {
+	return nil
+}
 
 const Mode = "kubelet"

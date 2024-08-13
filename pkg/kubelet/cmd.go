@@ -19,12 +19,13 @@ package kubelet
 
 import (
 	"fmt"
-	"github.com/go-logr/logr"
 	"os"
 	"path"
 	"path/filepath"
 	"strconv"
 	"sync"
+
+	"github.com/go-logr/logr"
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/spf13/pflag"
@@ -116,6 +117,22 @@ func IsCgroupV2() bool {
 	return libcontainercgroups.IsCgroup2UnifiedMode()
 }
 
+// GetCgroupNames
+// ref k8s.io/kubernetes@v1.28.4/pkg/kubelet/cm/cgroup_manager_linux.go
+func GetCgroupNames(logger logr.Logger, pod *corev1.Pod) (cm.CgroupName, error) {
+	// =======
+	// ref cgm.SetCgroupConfig
+	// =======
+	cgm, err := buildCgroupMgr(logger)
+	if err != nil {
+		logger.Error(err, "Failed to build cgroup manager")
+		return nil, err
+	}
+
+	podCgroupName, _ := GetPodContainerName(pod, cgm)
+	return podCgroupName, nil
+}
+
 // GetCgroupCpu is key function
 func GetCgroupCpu(logger logr.Logger, pod *corev1.Pod) *cm.ResourceConfig {
 
@@ -157,7 +174,7 @@ func GetCgroupCpu(logger logr.Logger, pod *corev1.Pod) *cm.ResourceConfig {
 	podCgroupName, _ := GetPodContainerName(pod, cgm)
 
 	// map: subsystem -> cgroup path
-	//cgroupPaths := buildCgroupPaths(podCgroupName, kubeletServer.CgroupDriver, subSystems)
+	//cgroupPaths := BuildCgroupPaths(podCgroupName, kubeletServer.CgroupDriver, subSystems)
 	//cpuCgroupPath := cgroupPaths[CgroupControllerCpu]
 
 	fmt.Printf("cgroup path: %s\n", cgm.Name(podCgroupName))
@@ -203,7 +220,7 @@ func setCgroupCpu(logger logr.Logger, pod *corev1.Pod) error {
 	podCgroupName, _ := pcm.GetPodContainerName(pod)
 
 	// map: subsystem -> cgroup path
-	cgroupPaths := buildCgroupPaths(podCgroupName, kubeletServer.CgroupDriver, subSystems)
+	cgroupPaths := BuildCgroupPaths(podCgroupName, kubeletServer.CgroupDriver, subSystems)
 	cpuCgroupPath := cgroupPaths[CgroupControllerCpu]
 
 	// set CPU
@@ -227,9 +244,8 @@ const CgroupControllerCpu = string(corev1.ResourceCPU)
 const CgroupControllerMemory = string(corev1.ResourceMemory)
 const CgroupControllerStorage = string(corev1.ResourceStorage) // this for Volume NOT for cgroup
 
-// buildCgroupPaths ref k8s.io/kubernetes@v1.28.4/pkg/kubelet/cm/cgroup_manager_linux.go
-func buildCgroupPaths(name cm.CgroupName, cgroupDriver string, subsystems *cm.CgroupSubsystems) map[string]string {
-	// fixme: check
+// BuildCgroupPaths ref k8s.io/kubernetes@v1.28.4/pkg/kubelet/cm/cgroup_manager_linux.go
+func BuildCgroupPaths(name cm.CgroupName, cgroupDriver string, subsystems *cm.CgroupSubsystems) map[string]string {
 	cgroupFsAdaptedName := name.ToCgroupfs()
 	if cgroupDriver == CgroupDriverSystemd {
 		cgroupFsAdaptedName = name.ToSystemd()
@@ -241,31 +257,37 @@ func buildCgroupPaths(name cm.CgroupName, cgroupDriver string, subsystems *cm.Cg
 	return cgroupPaths
 }
 
+// buildCgroupMgr
+// fixme: can just call once.
 func buildCgroupMgr(logger logr.Logger) (cm.CgroupManager, error) {
 	kubeletServer, err := GetKubeletServer(logger)
 	if err != nil {
-		panic(err)
+		logger.Error(err, "failed to get kubelet server")
+		return nil, err
 	}
 
 	kubeletDeps, err := app.UnsecuredDependencies(kubeletServer, utilfeature.DefaultFeatureGate)
 	_, err = app.UnsecuredDependencies(kubeletServer, utilfeature.DefaultFeatureGate)
 	if err != nil {
-		panic(fmt.Errorf("failed to construct kubelet dependencies: %w", err))
+		logger.Error(err, "failed to construct kubelet dependencies")
+		return nil, err
 	}
-	fmt.Printf("kubeletServer: %s\n", kubeletServer)
-	fmt.Printf("kubeletDeps is key for container_manager & cgroup manager: %v\n", kubeletDeps)
+	logger.Info("[Debug] kubeletServer: %s\n", kubeletServer)
+	logger.Info("[Debug] kubeletDeps is key for container_manager & cgroup manager: %v\n", kubeletDeps)
 
 	kubeDeps := kubeletDeps
 	s := kubeletServer
 
 	err = initCadvisorInterface(s, kubeDeps)
 	if err != nil {
+		logger.Error(err, "failed to init kubelet dependencies")
 		return nil, err
 	}
 
 	mgr, err := newCgroupManager(s, kubeDeps)
 	if err != nil {
-		panic(err)
+		logger.Error(err, "failed to new cgroup manager")
+		return nil, err
 	}
 	return mgr, err
 }

@@ -16,11 +16,17 @@ package pod
 
 import (
 	"context"
-	"github.com/go-logr/logr"
-	"github.com/matrixorigin/scale-agent/pkg/errcode"
 	"time"
 
+	"github.com/go-logr/logr"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
+
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/matrixorigin/scale-agent/pkg/errcode"
+	selfkubelet "github.com/matrixorigin/scale-agent/pkg/kubelet"
+	selfutil "github.com/matrixorigin/scale-agent/pkg/util"
+	"github.com/matrixorigin/scale-agent/pkg/util/cgroupv2"
 )
 
 type EventType int
@@ -30,6 +36,8 @@ const (
 	EventTypeNew
 	EventTypeUpdate
 	EventTypeDelete
+	EventTypeScaleUp
+	EventTypeScaleDown
 )
 
 type Event struct {
@@ -52,12 +60,24 @@ func (w *Worker) SendEvent(e Event) {
 
 func (w *Worker) loop() {
 	var ticker *time.Ticker
+	// double-check
+	server, err := selfkubelet.GetKubeletServer(w.Logger)
+	if err != nil {
+		w.Info("[Warn] kubelet server get error, pod worker quit", "err", err)
+		return
+	}
+	subSystems, err := cm.GetCgroupSubsystems()
+	if err != nil {
+		w.Info("[Warn] get cgroup subsystems error, pod worker quit", "err", err)
+		return
+	}
 mainL:
 	for {
 		ticker.Reset(w.interval)
 		select {
+		// all events go serially
 		case event := <-w.eventC:
-
+			// TODO: metric - how long each event run.
 			switch event.typ {
 			case EventTypeNew:
 				// TODO:
@@ -68,15 +88,31 @@ mainL:
 				w.Info("go down")
 				GetManger().EvictPod(w.pod)
 				break mainL
+			case EventTypeScaleUp:
+				// TODO:
+			case EventTypeScaleDown:
+				// TODO:
 			case EventTypeUnknown:
 				fallthrough
 			default:
 				w.Error(errcode.ErrUnknownEvent, "pod worker catch unknown event", "event", event)
 			}
-
 		case ts := <-ticker.C:
+			// TODO: metric - count ticker
 			// TODO: impl regular check
 			w.Info("regular check", "ts", ts)
+			// TODO: get cgroup names
+			cgroupNames, err := selfkubelet.GetCgroupNames(w.Logger, w.pod)
+			if err != nil {
+				w.Error(err, "failed to get cgroup names")
+				selfutil.TagNeedAlert() // fixme: need alert
+				// wait next loop
+				continue
+			}
+			// TODO: calculate all need cgroup data
+			// cgroup manager helps to calculate cgroup all data
+			toolkit, err := cgroupv2.NewToolkit(w.ctx, w.Logger, cgroupNames, server, subSystems)
+			// TODO: strategy manager trigger scale-up / scale-down
 
 		case <-w.ctx.Done():
 			w.Info("pod loop stopped")
