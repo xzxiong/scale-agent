@@ -19,16 +19,8 @@ type Toolkit interface {
 	CalculateCpuRate() float64
 	GetCpu() int
 	GetMemory() int64
-	GetMemoryEvent() MemoryEvent
+	GetMemoryEvent() MemoryEvents
 	Init() error
-}
-
-type MemoryEvent struct {
-	High    int
-	MAX     int
-	Low     int
-	OOM     int
-	OOMKill int
 }
 
 // ThrottlingData
@@ -68,9 +60,18 @@ type CpuStat struct {
 	ThrottlingData ThrottlingData `json:"throttling_data,omitempty"`
 }
 
+type MemoryEvents struct {
+	High    uint64 `json:"high,omitempty"`
+	Max     uint64 `json:"max,omitempty"`
+	Low     uint64 `json:"low,omitempty"`
+	OOM     uint64 `json:"oom,omitempty"`
+	OOMKill uint64 `json:"oom_kill,omitempty"`
+}
+
 // ref k8s.io/kubernetes@v1.28.4/pkg/kubelet/cm/cgroup_manager_linux.go
 const (
-	Cgroup2MemoryHigh  string = "memory.high"
-	Cgroup2MaxCpuLimit string = "max"
-	Cgroup2CpuStat     string = "cpu.stat"
+	Cgroup2MemoryHigh   string = "memory.high"
+	Cgroup2MaxCpuLimit  string = "max"
+	Cgroup2MemoryEvents string = "memory.events"
+	Cgroup2CpuStat      string = "cpu.stat"
 )

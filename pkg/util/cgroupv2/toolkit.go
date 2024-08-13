@@ -92,9 +92,12 @@ func (t *LinuxToolkit) GetCpu() int {
 func (t *LinuxToolkit) GetMemory() int64 {
 	return 0
 }
-func (t *LinuxToolkit) GetMemoryEvent() MemoryEvent {
-	//TODO implement me
-	panic("implement me")
+func (t *LinuxToolkit) GetMemoryEvent() MemoryEvents {
+	memEvents, _, err := t.getMemoryEvents()
+	if err != nil {
+		return MemoryEvents{}
+	}
+	return memEvents
 }
 
 func (t *LinuxToolkit) registerNotify() {
@@ -186,6 +189,50 @@ func (t *LinuxToolkit) getCpuStat() (stats CpuStat, ts time.Time, err error) {
 			return CpuStat{}, time.Time{}, err
 		}
 		t.logger.Error(err, "failed to read cpu.stat file", "cgroup", cgroupPath)
+		return
+	}
+	return stats, time.Now(), nil
+}
+
+func (t *LinuxToolkit) getMemoryEvents() (stats MemoryEvents, ts time.Time, err error) {
+	var key string
+	var v uint64
+	cgroupPaths := selfkubelet.BuildCgroupPaths(t.name, t.server.CgroupDriver, t.subSystems)
+	cgroupPath := cgroupPaths[selfkubelet.CgroupControllerMemory]
+
+	f, err := cgroups.OpenFile(cgroupPath, Cgroup2MemoryEvents, os.O_RDONLY)
+	if err != nil {
+		t.logger.Error(err, "failed to read memory.events file", "cgroup", cgroupPath)
+		return
+	}
+	defer f.Close()
+
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		key, v, err = fscommon.ParseKeyValue(sc.Text())
+		if err != nil {
+			t.logger.Error(err, "failed to read memory.events file", "cgroup", cgroupPath)
+			return
+		}
+		switch key {
+		case "high":
+			stats.High = v
+		case "max":
+			stats.Max = v
+		case "low":
+			stats.Low = v
+		case "oom":
+			stats.OOM = v
+		case "oom_kill":
+			stats.OOMKill = v
+		}
+	}
+	if err = sc.Err(); err != nil {
+		if os.IsNotExist(err) {
+			t.logger.Error(err, "file memory.events is not exist", "cgroup", cgroupPath)
+			return MemoryEvents{}, time.Time{}, err
+		}
+		t.logger.Error(err, "failed to read memory.events file", "cgroup", cgroupPath)
 		return
 	}
 	return stats, time.Now(), nil
