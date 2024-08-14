@@ -92,6 +92,7 @@ func (t *LinuxToolkit) GetCpu() int {
 func (t *LinuxToolkit) GetMemory() int64 {
 	return 0
 }
+
 func (t *LinuxToolkit) GetMemoryEvent() MemoryEvents {
 	memEvents, _, err := t.getMemoryEvents()
 	if err != nil {

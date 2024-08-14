@@ -16,8 +16,9 @@ package pod
 
 import (
 	"context"
-	"github.com/go-logr/logr"
 	"sync"
+
+	"github.com/go-logr/logr"
 
 	corev1 "k8s.io/api/core/v1"
 )
@@ -119,7 +120,7 @@ func WithLogger(logger logr.Logger) Option {
 	}
 }
 
-func NewDaemonSetManger(ctx context.Context, options ...Option) *DaemonSetManager {
+func NewDaemonSetManager(ctx context.Context, options ...Option) *DaemonSetManager {
 	m := &DaemonSetManager{
 		eventC: make(chan *corev1.Pod, 16),
 	}

@@ -64,7 +64,7 @@ func init() {
 
 func main() {
 	var ctx = context.Background()
-	var podManger *selfpod.DaemonSetManager
+	var podManager *selfpod.DaemonSetManager
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
@@ -132,7 +132,7 @@ func main() {
 		// TODO: init strategy manager
 		// TODO: init pod manager
 		// 	- need wait mgr.Elected()
-		podManger = selfpod.NewDaemonSetManger(ctx)
+		podManager = selfpod.NewDaemonSetManager(ctx)
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
@@ -186,11 +186,11 @@ func main() {
 	// init self-defined. indexer
 	setup.InitManagerIndexer(mgr, ctx)
 
-	if podManger != nil {
+	if podManager != nil {
 		go func() {
 			<-mgr.Elected()
 			setupLog.Info("starting pod manager")
-			podManger.Start()
+			podManager.Start()
 		}()
 	}
 
