@@ -120,20 +120,6 @@ func main() {
 		setupLog.Error(err, "failed to Load kubelet server")
 		os.Exit(1)
 	}
-	// check cgroup manager
-	isCgroupV2, err := setup.IsCgroupV2()
-	if err != nil {
-		setupLog.Error(err, "failed to check cgroup version")
-	}
-	if !isCgroupV2 {
-		// do NOT start up the main flow.
-		setupLog.Info("current cgroup version is not supported. please run in cgroup v2.")
-	} else {
-		// TODO: init strategy manager
-		// TODO: init pod manager
-		// 	- need wait mgr.Elected()
-		podManager = selfpod.NewDaemonSetManager(ctx)
-	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
@@ -163,6 +149,18 @@ func main() {
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
+	}
+
+	// check cgroup manager
+	isCgroupV2, err := setup.IsCgroupV2()
+	if err != nil {
+		setupLog.Error(err, "failed to check cgroup version")
+	}
+	if !isCgroupV2 {
+		// do NOT start up the main flow.
+		setupLog.Info("current cgroup version is not supported. please run in cgroup v2.")
+	} else {
+		podManager = selfpod.NewDaemonSetManager(ctx, selfpod.WithLogger(logger), selfpod.WithClient(mgr.GetClient()))
 	}
 
 	if err = (&controller.PodReconciler{

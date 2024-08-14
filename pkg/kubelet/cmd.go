@@ -146,38 +146,8 @@ func GetCgroupCpu(logger logr.Logger, pod *corev1.Pod) *cm.ResourceConfig {
 		panic(err)
 	}
 
-	//kubeletServer, err := GetKubeletServer()
-	//if err != nil {
-	//	panic(err)
-	//}
-
-	// kubeDeps, err := buildContainerMgr()
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	// subSystems, err := cm.GetCgroupSubsystems()
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	//cmgr := kubeDeps.ContainerManager
-	//pcm := cmgr.NewPodContainerManager()
-	//resCfg, err := pcm.GetPodCgroupConfig(nil, corev1.ResourceStorage)
-	// TODO: pcm dependence on call qosContainersInfo, which is important to gen pod CgroupName
-	// qosContainersInfo generate by qosContainerManager, construct while calling qosContainerManager.Start
-	// pcm.Start called by cmgr.setupNode() <- cmgr.Start(....)
-	// qosContainerManager, err := cm.NewQOSContainerManager(subsystems, cgroupRoot, nodeConfig, cgroupManager)
-	//
-	// deprecated:
-	// podCgroupName, _ := pcm.GetPodContainerName(pod)
 	podCgroupName, _ := GetPodContainerName(pod, cgm)
-
-	// map: subsystem -> cgroup path
-	//cgroupPaths := BuildCgroupPaths(podCgroupName, kubeletServer.CgroupDriver, subSystems)
-	//cpuCgroupPath := cgroupPaths[CgroupControllerCpu]
-
-	fmt.Printf("cgroup path: %s\n", cgm.Name(podCgroupName))
+	logger.Info("[Debug] cgroup path: %s", cgm.Name(podCgroupName))
 
 	resourceConfig, err := cgm.GetCgroupConfig(podCgroupName, corev1.ResourceCPU)
 	if err != nil {
@@ -243,6 +213,8 @@ const CgroupDriverSystemd = "systemd"
 const CgroupControllerCpu = string(corev1.ResourceCPU)
 const CgroupControllerMemory = string(corev1.ResourceMemory)
 const CgroupControllerStorage = string(corev1.ResourceStorage) // this for Volume NOT for cgroup
+const CgroupControllerIO = "io"                                // cgroup v2
+const CgroupControllerBlkIO = "blkio"                          // cgroup v1
 
 // BuildCgroupPaths ref k8s.io/kubernetes@v1.28.4/pkg/kubelet/cm/cgroup_manager_linux.go
 func BuildCgroupPaths(name cm.CgroupName, cgroupDriver string, subsystems *cm.CgroupSubsystems) map[string]string {

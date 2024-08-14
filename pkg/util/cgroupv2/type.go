@@ -14,12 +14,20 @@
 
 package cgroupv2
 
+import (
+	"time"
+
+	"github.com/matrixorigin/scale-agent/pkg/config"
+)
+
 type Toolkit interface {
 	CalculateThrottleRate() float64
 	CalculateCpuRate() float64
 	GetCpu() int
 	GetMemory() int64
 	GetMemoryEvent() MemoryEvents
+	HasMemoryHighEvent(time.Duration) bool
+	SetCgroupLimit(config.Quota, config.QuotaConfig) error
 	Init() error
 }
 

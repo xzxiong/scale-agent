@@ -16,6 +16,11 @@ package config
 
 const KeyMatrixoneCloudResourceRange = "matrixone.cloud/resource-range"
 
+const (
+	// AnnotationModifyResource work for cr update
+	AnnotationModifyResource = "matrixone.cloud/modify-resource"
+)
+
 const NodeNameAuto = "auto"
 
 // ENV key

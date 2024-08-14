@@ -19,6 +19,7 @@ import (
 	"sync"
 
 	"github.com/go-logr/logr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	corev1 "k8s.io/api/core/v1"
 )
@@ -84,20 +85,18 @@ func (d *DaemonSetManager) EvictPod(pod *corev1.Pod) {
 func (d *DaemonSetManager) loop() {
 	for {
 		select {
-
 		case pod := <-d.eventC:
 			d.mux.Lock()
 			cachedKey := GetNamespacedName(pod)
 			worker, exist := d.cache[cachedKey]
 			if exist {
-				worker.SendEvent(Event{EventTypeUpdate, pod})
+				worker.SendEvent(Event{typ: EventTypeUpdate, pod: pod})
 			} else {
-				worker = NewWorker(d.ctx, d.logger, pod)
+				worker = NewWorker(d.ctx, d.logger, pod, d.cli)
 				d.cache[cachedKey] = worker
 				go worker.loop()
-				worker.SendEvent(Event{EventTypeNew, pod})
+				worker.SendEvent(Event{typ: EventTypeNew, pod: pod})
 			}
-
 		case <-d.ctx.Done():
 		}
 	}
@@ -106,6 +105,7 @@ func (d *DaemonSetManager) loop() {
 
 type ManagerConfig struct {
 	logger logr.Logger
+	cli    client.Client
 }
 
 type Option func(*ManagerConfig)
@@ -117,6 +117,12 @@ func (o Option) Apply(cfg *ManagerConfig) {
 func WithLogger(logger logr.Logger) Option {
 	return func(cfg *ManagerConfig) {
 		cfg.logger = logger
+	}
+}
+
+func WithClient(cli client.Client) Option {
+	return func(cfg *ManagerConfig) {
+		cfg.cli = cli
 	}
 }
 

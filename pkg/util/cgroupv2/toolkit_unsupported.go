@@ -18,8 +18,14 @@
 package cgroupv2
 
 import (
+	"context"
+	"time"
+
+	"github.com/go-logr/logr"
+	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 
+	"github.com/matrixorigin/scale-agent/pkg/config"
 	"github.com/matrixorigin/scale-agent/pkg/errcode"
 )
 
@@ -28,13 +34,16 @@ var _ Toolkit = (*UnsupportedToolkit)(nil)
 
 type UnsupportedToolkit struct{}
 
-func (t UnsupportedToolkit) CalculateThrottleRate() float64 { return 0.0 }
-func (t UnsupportedToolkit) CalculateCpuRate() float64      { return 0.0 }
-func (t UnsupportedToolkit) GetCpu() int                    { return 0 }
-func (t UnsupportedToolkit) GetMemory() int64               { return 0 }
-func (t UnsupportedToolkit) GetMemoryEvent() MemoryEvent    { return MemoryEvent{} }
-func (t UnsupportedToolkit) Init() error                    { return errcode.ErrNotSupported }
+func (t UnsupportedToolkit) CalculateThrottleRate() float64        { return 0.0 }
+func (t UnsupportedToolkit) CalculateCpuRate() float64             { return 0.0 }
+func (t UnsupportedToolkit) GetCpu() int                           { return 0 }
+func (t UnsupportedToolkit) GetMemory() int64                      { return 0 }
+func (t UnsupportedToolkit) GetMemoryEvent() MemoryEvents          { return MemoryEvents{} }
+func (t UnsupportedToolkit) HasMemoryHighEvent(time.Duration) bool { return false }
+func (t UnsupportedToolkit) Init() error                           { return errcode.ErrNotSupported }
 
-func NewToolkit(context.Context, cm.CgroupName, *options.KubeletServer, *cm.CgroupSubsystems) Toolkit {
+func (t UnsupportedToolkit) SetCgroupLimit(config.Quota, config.QuotaConfig) error { return nil }
+
+func NewToolkit(context.Context, logr.Logger, cm.CgroupName, *options.KubeletServer, *cm.CgroupSubsystems) Toolkit {
 	return UnsupportedToolkit{}
 }

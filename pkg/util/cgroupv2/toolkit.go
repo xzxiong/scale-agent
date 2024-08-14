@@ -20,7 +20,9 @@ package cgroupv2
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -30,7 +32,9 @@ import (
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 
+	"github.com/matrixorigin/scale-agent/pkg/config"
 	selfkubelet "github.com/matrixorigin/scale-agent/pkg/kubelet"
+	selfutil "github.com/matrixorigin/scale-agent/pkg/util"
 )
 
 var _ Toolkit = (*LinuxToolkit)(nil)
@@ -99,6 +103,11 @@ func (t *LinuxToolkit) GetMemoryEvent() MemoryEvents {
 		return MemoryEvents{}
 	}
 	return memEvents
+}
+
+func (t *LinuxToolkit) HasMemoryHighEvent(time.Duration) bool {
+	// TODO
+	return false
 }
 
 func (t *LinuxToolkit) registerNotify() {
@@ -239,6 +248,51 @@ func (t *LinuxToolkit) getMemoryEvents() (stats MemoryEvents, ts time.Time, err 
 	return stats, time.Now(), nil
 }
 
+func numToStr(value int64) (ret string) {
+	switch {
+	case value == 0:
+		ret = ""
+	case value == -1:
+		ret = "max"
+	default:
+		ret = strconv.FormatInt(value, 10)
+	}
+
+	return ret
+}
+
+func (t *LinuxToolkit) SetCgroupLimit(quota config.Quota, cfg config.QuotaConfig) error {
+	cgroupPaths := selfkubelet.BuildCgroupPaths(t.name, t.server.CgroupDriver, t.subSystems)
+	memCgroupPath := cgroupPaths[selfkubelet.CgroupControllerMemory]
+	ioCgroupPath := cgroupPaths[selfkubelet.CgroupControllerIO]
+
+	//  set limit memory.high
+	if val := numToStr(quota.Memory.Value()); val != "" {
+		if err := cgroups.WriteFile(memCgroupPath, "memory.high", val); err != nil {
+			return err
+		}
+	}
+
+	// Set disk iops, Set Disk bandwidth
+	// fmt.Sprintf("8:16 rbps=2097152 wbps=max riops=max wiops=max")
+	devId := "default" // TODO: get the real disk id
+	rbps := cfg.DiskBandWidth.Value()
+	wbps := cfg.DiskBandWidth.Value()
+	riops := cfg.DiskIOPS
+	wiops := cfg.DiskIOPS
+	ioMaxVal := fmt.Sprintf("%s rbps=%s wbps=%s riops=%s wiops=%s",
+		devId,
+		numToStr(rbps), numToStr(wbps),
+		numToStr(riops), numToStr(wiops),
+	)
+	if err := cgroups.WriteFile(ioCgroupPath, "io.max", ioMaxVal); err != nil {
+		t.logger.Info("[Warn] failed to write io limit cgroup", "error", err)
+		selfutil.TagNeedAlert()
+	}
+
+	return nil
+}
+
 func NewToolkit(ctx context.Context, logger logr.Logger, cgroupName cm.CgroupName, server *options.KubeletServer, subSystems *cm.CgroupSubsystems) Toolkit {
 	t := &LinuxToolkit{
 		ctx:        ctx,
@@ -247,7 +301,7 @@ func NewToolkit(ctx context.Context, logger logr.Logger, cgroupName cm.CgroupNam
 		server:     server,
 		subSystems: subSystems,
 
-		interval: time.Second,
+		interval: 100 * time.Millisecond,
 	}
 	return t
 }
